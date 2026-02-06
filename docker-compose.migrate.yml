@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  migrate:
+    build: .
+    container_name: task_manager_migrate
+    env_file:
+      - .env
+    command: >
+      sh -c "npx prisma migrate deploy && npm run prisma:seed"

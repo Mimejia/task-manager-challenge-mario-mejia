@@ -1,0 +1,322 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model auth_tokens {
+  id         BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    BigInt                 @db.UnsignedBigInt
+  token_hash String                 @unique(map: "uq_auth_token_hash") @db.Char(64)
+  token_type auth_tokens_token_type
+  device_id  String?                @db.VarChar(80)
+  expires_at DateTime               @db.DateTime(0)
+  revoked_at DateTime?              @db.DateTime(0)
+  created_at DateTime               @default(now()) @db.DateTime(0)
+  users      users                  @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_auth_user")
+
+  @@index([expires_at], map: "ix_auth_expires")
+  @@index([user_id], map: "ix_auth_user")
+}
+
+model roles {
+  id         BigInt       @id @default(autoincrement()) @db.UnsignedBigInt
+  code       String       @unique(map: "uq_roles_code") @db.VarChar(50)
+  name       String       @db.VarChar(80)
+  user_roles user_roles[]
+}
+
+model sync_operations {
+  id               BigInt                      @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id          BigInt                      @db.UnsignedBigInt
+  device_id        String                      @db.VarChar(80)
+  op_id            String                      @db.Char(36)
+  entity_type      sync_operations_entity_type
+  entity_client_id String?                     @db.Char(36)
+  operation        sync_operations_operation
+  payload          Json
+  base_version     BigInt?                     @db.UnsignedBigInt
+  result           sync_operations_result
+  created_at       DateTime                    @default(now()) @db.DateTime(0)
+  users            users                       @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_sync_user")
+
+  @@unique([device_id, op_id], map: "uq_sync_op")
+  @@index([created_at], map: "ix_sync_created_at")
+  @@index([entity_type, entity_client_id], map: "ix_sync_entity")
+  @@index([user_id], map: "ix_sync_user")
+}
+
+model task_events {
+  id           BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
+  task_id      BigInt                   @db.UnsignedBigInt
+  event_type   task_events_event_type
+  from_status  task_events_from_status?
+  to_status    task_events_to_status?
+  details      Json?
+  base_version BigInt?                  @db.UnsignedBigInt
+  result       task_events_result       @default(applied)
+  device_id    String?                  @db.VarChar(80)
+  performed_by BigInt                   @db.UnsignedBigInt
+  created_at   DateTime                 @default(now()) @db.DateTime(0)
+  tasks        tasks                    @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_task_events_task")
+  users        users                    @relation(fields: [performed_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_task_events_user")
+
+  @@index([performed_by], map: "ix_task_events_by")
+  @@index([created_at], map: "ix_task_events_created_at")
+  @@index([task_id], map: "ix_task_events_task")
+  @@index([event_type], map: "ix_task_events_type")
+}
+
+model task_versions {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  task_id    BigInt   @db.UnsignedBigInt
+  version    BigInt   @db.UnsignedBigInt
+  snapshot   Json
+  created_at DateTime @default(now()) @db.DateTime(0)
+  created_by BigInt   @db.UnsignedBigInt
+  tasks      tasks    @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_task_versions_task")
+  users      users    @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_task_versions_user")
+
+  @@unique([task_id, version], map: "uq_task_versions")
+  @@index([created_by], map: "fk_task_versions_user")
+  @@index([task_id], map: "ix_task_versions_task")
+  @@index([version], map: "ix_task_versions_version")
+}
+
+model tasks {
+  id                                  BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  client_id                           String?         @unique(map: "uq_tasks_client_id") @db.Char(36)
+  client_rev                          BigInt          @default(0) @db.UnsignedBigInt
+  workspace_id                        BigInt          @db.UnsignedBigInt
+  title                               String          @db.VarChar(150)
+  description                         String?         @db.Text
+  status                              tasks_status    @default(pendiente)
+  owner_user_id                       BigInt          @db.UnsignedBigInt
+  assigned_user_id                    BigInt?         @db.UnsignedBigInt
+  is_deleted                          Boolean         @default(false)
+  deleted_at                          DateTime?       @db.DateTime(0)
+  deleted_by                          BigInt?         @db.UnsignedBigInt
+  version                             BigInt          @default(1) @db.UnsignedBigInt
+  last_modified_device_id             String?         @db.VarChar(80)
+  last_modified_at                    DateTime        @default(now()) @db.DateTime(0)
+  created_at                          DateTime        @default(now()) @db.DateTime(0)
+  updated_at                          DateTime        @default(now()) @db.DateTime(0)
+  created_by                          BigInt?         @db.UnsignedBigInt
+  updated_by                          BigInt?         @db.UnsignedBigInt
+  task_events                         task_events[]
+  task_versions                       task_versions[]
+  users_tasks_assigned_user_idTousers users?          @relation("tasks_assigned_user_idTousers", fields: [assigned_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tasks_assigned")
+  users_tasks_deleted_byTousers       users?          @relation("tasks_deleted_byTousers", fields: [deleted_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tasks_deleted_by")
+  users_tasks_owner_user_idTousers    users           @relation("tasks_owner_user_idTousers", fields: [owner_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tasks_owner")
+  workspaces                          workspaces      @relation(fields: [workspace_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tasks_workspace")
+
+  @@index([deleted_by], map: "fk_tasks_deleted_by")
+  @@index([assigned_user_id], map: "ix_tasks_assigned")
+  @@index([is_deleted], map: "ix_tasks_deleted")
+  @@index([last_modified_at], map: "ix_tasks_last_modified_at")
+  @@index([owner_user_id], map: "ix_tasks_owner")
+  @@index([status], map: "ix_tasks_status")
+  @@index([version], map: "ix_tasks_version")
+  @@index([workspace_id], map: "ix_tasks_workspace")
+}
+
+model user_action_tokens {
+  id         BigInt                        @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    BigInt                        @db.UnsignedBigInt
+  token_hash String                        @unique(map: "uq_action_token_hash") @db.Char(64)
+  token_type user_action_tokens_token_type
+  expires_at DateTime                      @db.DateTime(0)
+  used_at    DateTime?                     @db.DateTime(0)
+  revoked_at DateTime?                     @db.DateTime(0)
+  created_at DateTime                      @default(now()) @db.DateTime(0)
+  created_by BigInt?                       @db.UnsignedBigInt
+  users      users                         @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_action_user")
+
+  @@index([expires_at], map: "ix_action_expires")
+  @@index([token_type], map: "ix_action_type")
+  @@index([user_id], map: "ix_action_user")
+}
+
+model user_roles {
+  user_id    BigInt   @db.UnsignedBigInt
+  role_id    BigInt   @db.UnsignedBigInt
+  created_at DateTime @default(now()) @db.DateTime(0)
+  created_by BigInt?  @db.UnsignedBigInt
+  roles      roles    @relation(fields: [role_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_roles_role")
+  users      users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_roles_user")
+
+  @@id([user_id, role_id])
+  @@index([role_id], map: "fk_user_roles_role")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model users {
+  id                                                    BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  email                                                 String               @unique(map: "uq_users_email")
+  full_name                                             String               @db.VarChar(150)
+  phone                                                 String?              @db.VarChar(30)
+  auth_provider                                         users_auth_provider
+  google_sub                                            String?              @unique(map: "uq_users_google_sub")
+  password_hash                                         String?              @db.VarChar(255)
+  password_algo                                         users_password_algo  @default(bcrypt)
+  is_active                                             Boolean              @default(true)
+  email_verified_at                                     DateTime?            @db.DateTime(0)
+  created_at                                            DateTime             @default(now()) @db.DateTime(0)
+  updated_at                                            DateTime             @default(now()) @db.DateTime(0)
+  created_by                                            BigInt?              @db.UnsignedBigInt
+  updated_by                                            BigInt?              @db.UnsignedBigInt
+  auth_tokens                                           auth_tokens[]
+  sync_operations                                       sync_operations[]
+  task_events                                           task_events[]
+  task_versions                                         task_versions[]
+  tasks_tasks_assigned_user_idTousers                   tasks[]              @relation("tasks_assigned_user_idTousers")
+  tasks_tasks_deleted_byTousers                         tasks[]              @relation("tasks_deleted_byTousers")
+  tasks_tasks_owner_user_idTousers                      tasks[]              @relation("tasks_owner_user_idTousers")
+  user_action_tokens                                    user_action_tokens[]
+  user_roles                                            user_roles[]
+  workspace_members_workspace_members_invited_byTousers workspace_members[]  @relation("workspace_members_invited_byTousers")
+  workspace_members_workspace_members_user_idTousers    workspace_members[]  @relation("workspace_members_user_idTousers")
+  workspaces                                            workspaces[]
+
+  @@index([is_active], map: "ix_users_active")
+  @@index([auth_provider], map: "ix_users_provider")
+}
+
+model workspace_invitations {
+  id           BigInt                       @id @default(autoincrement()) @db.UnsignedBigInt
+  workspace_id BigInt                       @db.UnsignedBigInt
+  email        String?
+  token_hash   String                       @unique(map: "uq_invite_token_hash") @db.Char(64)
+  status       workspace_invitations_status @default(pending)
+  expires_at   DateTime                     @db.DateTime(0)
+  can_view     Boolean                      @default(true)
+  can_create   Boolean                      @default(false)
+  can_edit     Boolean                      @default(false)
+  can_delete   Boolean                      @default(false)
+  created_at   DateTime                     @default(now()) @db.DateTime(0)
+  created_by   BigInt?                      @db.UnsignedBigInt
+  workspaces   workspaces                   @relation(fields: [workspace_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_invite_workspace")
+
+  @@index([email], map: "ix_invite_email")
+  @@index([status], map: "ix_invite_status")
+  @@index([workspace_id], map: "ix_invite_workspace")
+}
+
+model workspace_members {
+  workspace_id                              BigInt     @db.UnsignedBigInt
+  user_id                                   BigInt     @db.UnsignedBigInt
+  can_view                                  Boolean    @default(true)
+  can_create                                Boolean    @default(false)
+  can_edit                                  Boolean    @default(false)
+  can_delete                                Boolean    @default(false)
+  joined_at                                 DateTime   @default(now()) @db.DateTime(0)
+  invited_by                                BigInt?    @db.UnsignedBigInt
+  users_workspace_members_invited_byTousers users?     @relation("workspace_members_invited_byTousers", fields: [invited_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_wm_invited_by")
+  users_workspace_members_user_idTousers    users      @relation("workspace_members_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_wm_user")
+  workspaces                                workspaces @relation(fields: [workspace_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_wm_workspace")
+
+  @@id([workspace_id, user_id])
+  @@index([invited_by], map: "fk_wm_invited_by")
+  @@index([user_id], map: "fk_wm_user")
+}
+
+model workspaces {
+  id                    BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
+  name                  String                  @db.VarChar(120)
+  owner_user_id         BigInt                  @db.UnsignedBigInt
+  is_archived           Boolean                 @default(false)
+  created_at            DateTime                @default(now()) @db.DateTime(0)
+  updated_at            DateTime                @default(now()) @db.DateTime(0)
+  created_by            BigInt?                 @db.UnsignedBigInt
+  updated_by            BigInt?                 @db.UnsignedBigInt
+  tasks                 tasks[]
+  workspace_invitations workspace_invitations[]
+  workspace_members     workspace_members[]
+  users                 users                   @relation(fields: [owner_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_workspaces_owner")
+
+  @@index([owner_user_id], map: "ix_workspaces_owner")
+}
+
+enum task_events_event_type {
+  created
+  updated
+  status_changed
+  moved_to_trash
+  restored
+  reverted
+  shared
+  permission_changed
+}
+
+enum auth_tokens_token_type {
+  access
+  refresh
+}
+
+enum task_events_from_status {
+  pendiente
+  en_progreso
+  completada
+}
+
+enum user_action_tokens_token_type {
+  verify_email
+  reset_password
+}
+
+enum sync_operations_entity_type {
+  task
+  workspace_member
+}
+
+enum task_events_to_status {
+  pendiente
+  en_progreso
+  completada
+}
+
+enum users_auth_provider {
+  local
+  google
+}
+
+enum workspace_invitations_status {
+  pending
+  accepted
+  revoked
+  expired
+}
+
+enum sync_operations_operation {
+  create
+  update
+  status
+  delete
+  restore
+  revert
+}
+
+enum tasks_status {
+  pendiente
+  en_progreso
+  completada
+}
+
+enum task_events_result {
+  applied
+  conflict
+  rejected
+}
+
+enum users_password_algo {
+  bcrypt
+}
+
+enum sync_operations_result {
+  applied
+  conflict
+  rejected
+}
