@@ -37,23 +37,28 @@ Todo el proyecto corre en Docker, y también fue probado en Raspberry Pi 5 para 
 - Auth: JWT (access + refresh)
 - Offline-first: sincronización transaccional con versionado
 
-## Configuración rápida
+## Configuracion rapida (sin editar codigo)
 
-Crea un archivo `.env` en la raíz:
+Este repo ya incluye `.env` con valores de prueba para que el evaluador solo ejecute los comandos.
+Si tu base de datos es remota, solo cambia el host en `DATABASE_URL`.
+Ejemplo: `@localhost` -> `@tu-servidor`.
+
+Valores por defecto en `.env`:
 
 ```env
 PORT=3000
 NODE_ENV=development
 DATABASE_URL="mysql://taskuser:taskpassword@localhost:3306/task_manager"
-JWT_ACCESS_SECRET="dev_access_secret"
-JWT_REFRESH_SECRET="dev_refresh_secret"
+# Generic JWT secrets for evaluation/demo only. Replace in real deployments.
+JWT_ACCESS_SECRET="dev_access_secret_generic"
+JWT_REFRESH_SECRET="dev_refresh_secret_generic"
 JWT_ACCESS_EXPIRES_IN="15m"
 JWT_REFRESH_EXPIRES_IN="7d"
 ```
 
-## Cómo correr el proyecto
+## Como correr el proyecto
 
-### Opción A: Docker
+### Opcion A: Docker (lo mas rapido)
 
 ```bash
 docker compose up --build
@@ -61,7 +66,7 @@ docker compose up --build
 
 La API queda en `http://localhost:3000/api`.
 
-### Opción B: Desarrollo local
+### Opcion B: Desarrollo local
 
 ```bash
 npm install
@@ -73,7 +78,7 @@ npm run dev
 
 ## Migraciones y seed
 
-Para una base nueva:
+Para una base nueva (recomendado para evaluacion):
 
 ```bash
 npx prisma migrate dev
@@ -87,6 +92,12 @@ ADMIN_EMAIL=admin@local.test
 ADMIN_PASSWORD=Admin123!
 ADMIN_FULL_NAME=Admin
 ```
+
+## Solucion rapida de problemas
+
+- **Warning de Prisma 7 en el schema**: este proyecto usa Prisma 6. Ya viene fijado en [./.vscode/settings.json](.vscode/settings.json) con `prisma.pinToPrisma6=true`. Si lo ves igual, reinicia VS Code o la extension de Prisma.
+- **Error de conexion a MySQL**: verifica que Docker este arriba y el puerto 3306 disponible (`docker compose up -d db`).
+- **Login 500**: asegura que corriste `npx prisma migrate dev` y `npm run prisma:seed` antes de probar login.
 
 ## Endpoints clave
 
