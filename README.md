@@ -48,7 +48,9 @@ Valores por defecto en `.env`:
 ```env
 PORT=3000
 NODE_ENV=development
-DATABASE_URL="mysql://taskuser:taskpassword@localhost:3306/task_manager"
+# Ajuste para evaluación: Usamos 'root' para permitir la creación de la shadow database durante las migraciones.
+# Configuración original: DATABASE_URL="mysql://taskuser:taskpassword@localhost:3306/task_manager"
+DATABASE_URL="mysql://root:root@localhost:3306/task_manager"
 # Generic JWT secrets for evaluation/demo only. Replace in real deployments.
 JWT_ACCESS_SECRET="dev_access_secret_generic"
 JWT_REFRESH_SECRET="dev_refresh_secret_generic"
